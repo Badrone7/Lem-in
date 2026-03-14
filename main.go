@@ -7,11 +7,11 @@ import (
 	z01 "Z01/dependencies"
 )
 
-func main(){
+func main() {
 	if len(os.Args) != 2 {
 		fmt.Println("Usage: go run main.go <input_file>")
 		return
-	}	
+	}
 	inputFile := os.Args[1]
 	graph, err := z01.ParseInput(inputFile)
 	if err != nil {
@@ -30,11 +30,11 @@ func main(){
 	}
 
 	z01.AssignAntsToPaths(graph, paths)
-	moves := z01.SimulateAntMovements(graph, paths)
-
-	for _, move := range moves {
-		fmt.Printf("L%d-%s ", move.AntID, move.RoomName)
+	allMoves := z01.SimulateAntMovements(graph, paths)
+	for _, moves := range allMoves {
+		for _, move := range moves {
+			fmt.Printf("L%d-%s ", move.AntID, move.RoomName)
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 }
-
