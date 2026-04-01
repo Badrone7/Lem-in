@@ -52,7 +52,8 @@ func FindPaths(graph *Graph) ([]*Path, error) {
 type edge struct {
 	toNode       int
 	capacity     int
-	reverseIndex int // index of reverse edge in adjacency[toNode]
+	reverseIndex int
+	isReverse    bool
 }
 
 type residualGraph struct {
@@ -89,11 +90,13 @@ func buildResidualGraph(graph *Graph) *residualGraph {
 			toNode:       toNode,
 			capacity:     edgeCapacity,
 			reverseIndex: len(flowNetwork.adjacency[toNode]),
+			isReverse:    false,
 		})
 		flowNetwork.adjacency[toNode] = append(flowNetwork.adjacency[toNode], edge{
 			toNode:       fromNode,
 			capacity:     0,
 			reverseIndex: len(flowNetwork.adjacency[fromNode]) - 1,
+			isReverse:    true,
 		})
 	}
 
@@ -147,12 +150,10 @@ func bfsAugment(flowNetwork *residualGraph) []int {
 		queue = queue[1:]
 
 		if currentNode == flowNetwork.endIn {
-			// Reconstruct the path by walking backwards through parentNode.
 			augmentingPath := []int{flowNetwork.endIn}
 			for augmentingPath[len(augmentingPath)-1] != flowNetwork.startOut {
 				augmentingPath = append(augmentingPath, parentNode[augmentingPath[len(augmentingPath)-1]])
 			}
-			// Reverse so path goes from start → end.
 			for left, right := 0, len(augmentingPath)-1; left < right; left, right = left+1, right-1 {
 				augmentingPath[left], augmentingPath[right] = augmentingPath[right], augmentingPath[left]
 			}
@@ -175,12 +176,10 @@ func bfsAugment(flowNetwork *residualGraph) []int {
 func applyAugmentation(flowNetwork *residualGraph, augmentingPath []int) {
 	for stepIndex := 0; stepIndex < len(augmentingPath)-1; stepIndex++ {
 		fromNode, toNode := augmentingPath[stepIndex], augmentingPath[stepIndex+1]
-		// Find the forward edge fromNode→toNode and decrease its remaining capacity by 1.
 		for edgeIndex := range flowNetwork.adjacency[fromNode] {
 			if flowNetwork.adjacency[fromNode][edgeIndex].toNode == toNode &&
 				flowNetwork.adjacency[fromNode][edgeIndex].capacity > 0 {
 				flowNetwork.adjacency[fromNode][edgeIndex].capacity--
-				// Increase the reverse edge capacity so we can "undo" this choice later.
 				flowNetwork.adjacency[toNode][flowNetwork.adjacency[fromNode][edgeIndex].reverseIndex].capacity++
 				break
 			}
@@ -195,16 +194,14 @@ type flowEdge struct {
 
 // extractPaths reconstructs node-disjoint paths from the current flow state.
 func extractPaths(flowNetwork *residualGraph, graph *Graph) []*Path {
-	// For each forward edge, flow amount = its reverse edge's current capacity.
-
 	flowAdjacency := make([][]flowEdge, flowNetwork.nodeCount)
 	for fromNode := 0; fromNode < flowNetwork.nodeCount; fromNode++ {
 		for _, currentEdge := range flowNetwork.adjacency[fromNode] {
-			// The reverse edge's capacity tells us how much flow runs on the forward edge.
-			// It starts at 0 and grows only when flow is pushed through.
+			if currentEdge.isReverse {
+				continue
+			}
 			reverseEdge := flowNetwork.adjacency[currentEdge.toNode][currentEdge.reverseIndex]
 			if reverseEdge.capacity > 0 {
-				// Simple approach: record directed flow for all edges with positive flow.
 				flowAdjacency[fromNode] = append(flowAdjacency[fromNode], flowEdge{
 					toNode:     currentEdge.toNode,
 					flowAmount: reverseEdge.capacity,
@@ -213,7 +210,6 @@ func extractPaths(flowNetwork *residualGraph, graph *Graph) []*Path {
 		}
 	}
 
-	// Walk paths from startOut to endIn, consuming flow as we go.
 	var paths []*Path
 
 	for {
@@ -221,7 +217,6 @@ func extractPaths(flowNetwork *residualGraph, graph *Graph) []*Path {
 		if nodePath == nil {
 			break
 		}
-		// Convert the split-node path back to real room names.
 		rooms := splitPathToRooms(nodePath, flowNetwork, graph)
 		if len(rooms) >= 2 {
 			paths = append(paths, &Path{Rooms: rooms, AntsAssigned: 0})
@@ -275,9 +270,9 @@ func splitPathToRooms(nodePath []int, flowNetwork *residualGraph, graph *Graph) 
 	var rooms []*Room
 	previousRoomIndex := -1
 	for _, nodeID := range nodePath {
-		roomIndex := nodeID / 2 // both inNode (2*i) and outNode (2*i+1) belong to room i
+		roomIndex := nodeID / 2
 		if roomIndex == previousRoomIndex {
-			continue // skip the outNode of the same room we just added
+			continue
 		}
 		previousRoomIndex = roomIndex
 		roomName := flowNetwork.indexToRoom[roomIndex]

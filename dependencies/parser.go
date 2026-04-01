@@ -29,16 +29,16 @@ func ParseInput(filename string) (*Graph, error) {
 
 	coordsSeen := make(map[string]bool)
 	linksSeen := make(map[string]bool)
+	output := ""
 
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
+		output += line + "\n"
 
 		if line == "" {
 			continue
 		}
-
-		// Parse ants first
 		if !antsParsed {
 			if strings.HasPrefix(line, "#") {
 				continue
@@ -53,8 +53,6 @@ func ParseInput(filename string) (*Graph, error) {
 			antsParsed = true
 			continue
 		}
-
-		// Handle comments and commands
 		if strings.HasPrefix(line, "#") {
 			switch line {
 			case "##start":
@@ -76,14 +74,9 @@ func ParseInput(filename string) (*Graph, error) {
 				}
 				nextIsEnd = true
 				nextIsStart = false
-
-			default:
-				// Ignore normal comments and unknown commands
 			}
 			continue
 		}
-
-		// Parse link
 		if strings.Contains(line, "-") && !strings.Contains(line, " ") {
 			linksStarted = true
 
@@ -173,7 +166,6 @@ func ParseInput(filename string) (*Graph, error) {
 
 			continue
 		}
-
 		return nil, fmt.Errorf("ERROR: invalid data format, invalid line %d: %s", lineNumber, line)
 	}
 
@@ -196,7 +188,7 @@ func ParseInput(filename string) (*Graph, error) {
 	if graph.End == nil {
 		return nil, fmt.Errorf("ERROR: invalid data format, no end room found")
 	}
-
+	fmt.Println(output)
 	return graph, nil
 }
 
